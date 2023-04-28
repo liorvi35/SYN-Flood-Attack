@@ -8,7 +8,7 @@ While the `Target` is under the DDoS attack from the `Attacker`, the `Monitor`
 should send an ICMP (Internet-Control-Message-Protocol) request and receive an ICMP response,
 it should also calculate the RTT (Round-Trip-Time) of the ping-pong.
 
-:version: 1.2
+:version: 1.3
 :since: 28/04/2023
 :authors: Lior Vinman & Yoad Tamar
 """
@@ -21,8 +21,6 @@ import sys
 FILE = "pings_results_p.txt"  # filename of the results file
 MONITOR_ADDR = "10.9.0.5"   # monitor machine ip address
 TARGET_ADDR = "10.9.0.3"  # target machine ip address
-NUM_ITERATIONS = 100  # num of attack iterations
-NUM_PACKETS = 10000  # num of packets that should be sent in each iteration
 TIMEOUT = 5  # a timeout after each ping
 SUCCESS = 0  # program's success exit code
 FAIL = 1  # program's failure exit code
@@ -34,29 +32,34 @@ def main():
         icmp_header = scapy.ICMP()
         ping_packet = (ip_header / icmp_header)
 
-        avg = 0
+        avg = seq = 0
         with open(FILE, "w") as file:
-            for i in range(NUM_ITERATIONS):
-                for j in range(NUM_PACKETS):
-                    before_send = time.time()
-                    scapy.sr1(ping_packet, verbose=False)
-                    after_send = time.time()
+            while True:
+                before_send = time.time()
+                scapy.sr1(ping_packet, verbose=False)
+                after_send = time.time()
 
-                    avg += (after_send - before_send)
+                avg += (after_send - before_send)
 
-                    file.write(f"{(i * NUM_PACKETS) + j} {(after_send - before_send)}\n")
-                    file.flush()
+                file.write(f"{seq} {(after_send - before_send)}\n")
+                file.flush()
 
-                    time.sleep(TIMEOUT)
+                seq += 1
 
-                print(f"Sent {((i + 1) * NUM_PACKETS)} packets.")
-
-            avg /= (NUM_ITERATIONS * NUM_PACKETS)
-            file.write(f"{avg}")
-            file.flush()
+                time.sleep(TIMEOUT)
 
     except KeyboardInterrupt:
         print("\nStopping monitor...")
+
+        with open(FILE, "a") as file:
+            if "avg" not in locals():
+                avg = 0
+            if "seq" not in locals():
+                seq = 1
+            avg /= seq
+            file.write(f"{avg}")
+            file.flush()
+
         sys.exit(SUCCESS)
     except Exception as e:
         print(f"Error: {e}.")
