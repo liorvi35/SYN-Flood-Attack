@@ -52,10 +52,8 @@ def main():
         print("\nStopping monitor...")
 
         with open(FILE, "a") as file:
-            if "avg" not in locals():
-                avg = 0
-            if "seq" not in locals():
-                seq = 1
+            if "avg" not in locals() or "seq" not in locals():
+                avg, seq = 0, 1
             avg /= seq
             file.write(f"{avg}")
             file.flush()
