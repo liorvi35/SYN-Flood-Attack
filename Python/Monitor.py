@@ -18,44 +18,45 @@ import scapy.all as scapy
 import time
 import sys
 
+FILE = "pings_results_p.txt"  # filename of the results file
 MONITOR_ADDR = "10.9.0.5"   # monitor machine ip address
 TARGET_ADDR = "10.9.0.3"  # target machine ip address
-FILE = "pings_results_p.txt"  # filename of the results file
+NUM_ITERATIONS = 100  # num of attack iterations
+NUM_PACKETS = 10000  # num of packets that should be sent in each iteration
 TIMEOUT = 5  # a timeout after each ping
 SUCCESS = 0  # program's success exit code
 FAIL = 1  # program's failure exit code
 
 
 def main():
-    seq = avg = 0
     try:
         ip_header = scapy.IP(src=MONITOR_ADDR, dst=TARGET_ADDR)
         icmp_header = scapy.ICMP()
         ping_packet = (ip_header / icmp_header)
 
+        avg = 0
         with open(FILE, "w") as file:
-            while True:
-                before_send = time.time()
-                scapy.sr1(ping_packet, verbose=False)
-                after_send = time.time()
+            for i in range(NUM_ITERATIONS):
+                for j in range(NUM_PACKETS):
+                    before_send = time.time()
+                    scapy.sr1(ping_packet, verbose=False)
+                    after_send = time.time()
 
-                avg += (after_send - before_send)
+                    avg += (after_send - before_send)
 
-                file.write(f"{seq} {(after_send - before_send)}\n")
-                file.flush()
+                    file.write(f"{(i * NUM_PACKETS) + j} {(after_send - before_send)}\n")
+                    file.flush()
 
-                seq += 1
+                    time.sleep(TIMEOUT)
 
-                time.sleep(TIMEOUT)
+                print(f"Sent {((i + 1) * NUM_PACKETS)} packets.")
 
-    except KeyboardInterrupt:
-        print("\nStopping monitor...")
-
-        avg /= seq
-        with open(FILE, "a") as file:
+            avg /= (NUM_ITERATIONS * NUM_PACKETS)
             file.write(f"{avg}")
             file.flush()
 
+    except KeyboardInterrupt:
+        print("\nStopping monitor...")
         sys.exit(SUCCESS)
     except Exception as e:
         print(f"Error: {e}.")
