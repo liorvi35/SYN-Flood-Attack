@@ -10,13 +10,13 @@
 #define TARGET_PORT 80
 #define NUM_PACKETS 10000
 #define NUM_ITERATIONS 100
+#define TIMEOUT 0.001
 
 void set_ip_layer(struct sockaddr_in*, struct iphdr*, int, FILE*);
 void set_tcp_layer(struct sockaddr_in*, struct iphdr*, struct tcphdr*);
 
 uint16_t calculate_ip_checksum(struct iphdr*);
 uint16_t calculate_tcp_checksum(struct iphdr*, struct tcphdr*);
-
 
 int get_random_port();
 char* get_random_ipv4(int, FILE*);
