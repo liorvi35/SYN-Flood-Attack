@@ -17,7 +17,7 @@ import random
 import time
 import sys
 
-ATTACKER_ADDR = ("10.9.0.2", 12345)  # attacker machine ip address and port
+ATTACKER_ADDR = ("10.9.0.1", 12345)  # attacker machine ip address and port
 TARGET_ADDR = ("10.9.0.3", 80)  # target machine ip address and port 80 for HTTP server
 FILE = "syns_results_p.txt"  # filename of the results file
 NUM_ITERATIONS = 100  # num of attack iterations
