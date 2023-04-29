@@ -6,7 +6,7 @@
 #include <netinet/tcp.h>
 
 #define RESULTS_FILE "syns_results_c.txt"
-#define TARGET_IP_ADDR "10.9.0.3"
+#define TARGET_IP_ADDR "10.9.0.4"
 #define TARGET_PORT 80
 #define NUM_PACKETS 10000
 #define NUM_ITERATIONS 100
