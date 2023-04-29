@@ -67,7 +67,7 @@ uint16_t calculate_tcp_checksum(struct iphdr *ip, struct tcphdr *tcp)
 
 int get_random_port()
 {
-    return rand() % (65535 - 1024 + 1) + 1024;
+    return (int)(rand() % (65535 - 1024 + 1) + 1024);
 }
 
 
@@ -128,8 +128,6 @@ void set_tcp_layer(struct sockaddr_in *target, struct iphdr *ip, struct tcphdr *
 }
 
 
-
-
 int main(int argc, char *argv[])
 {
     srand(time(NULL));
@@ -145,11 +143,18 @@ int main(int argc, char *argv[])
     int buffer_size = 1024 * 1024;
     if(setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &buffer_size, sizeof(int)) < 0)
     {
-        perror("setsockopt() failed");
+        perror("buffer-size setsockopt() failed");
         close(sock);
         exit(errno);
     }
 
+    int optval = 1;
+    if (setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &optval, sizeof(int)) < 0)
+    {
+        perror("IP setsockopt() failed");
+        close(sock);
+        exit(errno);
+    }
 
     FILE *file = NULL;
     file = fopen(RESULTS_FILE, "w");
@@ -210,6 +215,8 @@ int main(int argc, char *argv[])
             avg += (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000000.0;
 
             fprintf(file, "%d %f\n", (i * NUM_PACKETS + j), ((end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000000.0));
+        
+            sleep(TIMEOUT);
         }
     }
 
