@@ -19,8 +19,8 @@ import time
 import sys
 
 FILE = "pings_results_p.txt"  # filename of the results file
-MONITOR_ADDR = "10.9.0.2"   # monitor machine ip address
-TARGET_ADDR = "10.9.0.3"  # target machine ip address
+MONITOR_ADDR = "10.9.0.3"   # monitor machine ip address
+TARGET_ADDR = "10.9.0.4"  # target machine ip address
 TIMEOUT = 5  # a timeout after each ping
 SUCCESS = 0  # program's success exit code
 FAIL = 1  # program's failure exit code
