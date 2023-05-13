@@ -2,23 +2,37 @@
 #define _ATTACK_H_
 
 #include <stdio.h>
-#include <netinet/ip.h>
+#include <stdlib.h>
 #include <netinet/tcp.h>
+#include <netinet/ip.h>
 
+
+#define SERVER_IP_ADDRESS getenv("SERVER_ADDRESS")
+#define SERVER_PORT atoi(getenv("SERVER_PORT"))
 #define RESULTS_FILE "syns_results_c.txt"
-#define TARGET_IP_ADDR "10.9.0.4"
-#define TARGET_PORT 80
-#define NUM_PACKETS 10000
 #define NUM_ITERATIONS 100
-#define TIMEOUT 0.001
+#define NUM_PACKETS 10000
+#define IP_ADDR_LENGTH 16
 
-void set_ip_layer(struct sockaddr_in*, struct iphdr*, int, FILE*);
-void set_tcp_layer(struct sockaddr_in*, struct iphdr*, struct tcphdr*);
 
-uint16_t calculate_ip_checksum(struct iphdr*);
-uint16_t calculate_tcp_checksum(struct iphdr*, struct tcphdr*);
+struct pseudo_header
+{
+    unsigned int source_address;
+    unsigned int destination_address;
+    unsigned char placeholder;
+    unsigned int protocol;
+    unsigned short tcp_length;
 
-int get_random_port();
+    struct tcphdr tcph;
+};
+
+
+
+void set_packet(char*, struct iphdr*, struct tcphdr*, struct sockaddr_in, struct pseudo_header, int, FILE*);
+unsigned short calculate_checksum(unsigned short*, int);
 char* get_random_ipv4(int, FILE*);
+int get_random_port();
+
+
 
 #endif
