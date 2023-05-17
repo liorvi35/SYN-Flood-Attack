@@ -56,9 +56,11 @@ Based on the previous section, there are three Docker machines that have already
   - `Target` - 10.9.0.4
   <br/>
 1. On the Target machine, start the server by running the following commands:<br/>
-  `service apache2 start`.<br/>
-  `service apache2 status`.
-2. On the Attacker machine, you can use either Attack.py or Attack.c (compiled with ./Attack) to launch an attack on the Target.
+- `service apache2 start`. <br/>
+- `service apache2 status`.
+  
+2. On the Attacker machine, you can use either Attack.py or Attack.c (compiled with ./Attack) to launch an attack on the Target.<br/>
+  
 2. On the Monitor machine, you can use either Monitor.py or Monitor.c (compiled with ./Monitor) to monitor the responses from the Target
 
 
