@@ -13,8 +13,8 @@ default: all
 all: $(TARGETS)
 
 Attack: Attack.c Attack.h
-	$(CC) $(FLAGS) -c $^ # Compilation
-	$(CC) $(FLAGS) -o $@ $@.o # Linkage
+	$(CC) $(FLAGS) -c $^
+	$(CC) $(FLAGS) -o $@ $@.o
 
 
 Monitor: Monitor.c Monitor.h
