@@ -44,7 +44,7 @@ On the Target, also run:<br/>
 
 5. For Python: Install the required modules by running the following command:<br/>`pip3 install -r requirements.txt`.
 
-6.To compile the code in C, use the following command:<br/>`make`.
+6. To compile the code in C, use the following command:<br/>`make`.
     
 7. Don't forget to disable all containers when you're finished using them:<br/>`sudo docker-compose down`.
 
